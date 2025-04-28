@@ -6,187 +6,33 @@
   <title>Book Scanner</title>
   <link rel="manifest" href="manifest.json" />
   <link rel="icon" sizes="192x192" href="icon-192.png" />
-  <style>
-    :root {
-      --primary-color: #6200ee;
-      --primary-dark: #3700b3;
-      --secondary-color: #03dac6;
-      --background: #f5f5f5;
-      --card-bg: #ffffff;
-      --text-color: #333333;
-      --light-gray: #e0e0e0;
-    }
-
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    }
-
-    body {
-      background-color: var(--background);
-      color: var(--text-color);
-      line-height: 1.6;
-      padding-bottom: 80px;
-    }
-
-    header {
-      background-color: var(--primary-color);
-      color: white;
-      padding: 1rem;
-      text-align: center;
-      position: sticky;
-      top: 0;
-      z-index: 100;
-      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
-    }
-
-    .btn {
-      background-color: var(--primary-color);
-      color: white;
-      border: none;
-      padding: 0.75rem 1.5rem;
-      margin: 0.5rem 0;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 1rem;
-      transition: background-color 0.3s;
-      display: inline-block;
-      text-align: center;
-    }
-
-    .btn:hover {
-      background-color: var(--primary-dark);
-    }
-
-    .notification {
-      position: fixed;
-      bottom: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      background-color: var(--primary-color);
-      color: white;
-      padding: 0.75rem 1.5rem;
-      border-radius: 4px;
-      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
-      z-index: 1000;
-      display: none;
-      animation: slideUpFade 0.5s ease-out;
-    }
-
-    @keyframes slideUpFade {
-      from {
-        opacity: 0;
-        transform: translate(-50%, 20px);
-      }
-      to {
-        opacity: 1;
-        transform: translate(-50%, 0);
-      }
-    }
-  </style>
+  <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <header>
     <h1>Book Scanner</h1>
   </header>
+
   <main>
+    <input type="file" accept="image/*" capture="environment" id="cameraInput" style="display:none" />
     <input type="file" accept="image/*" id="uploadInput" style="display:none" />
+
     <div class="btn-container">
-      <button class="btn" onclick="document.getElementById('uploadInput').click()">Upload Image</button>
+      <button class="btn" onclick="openCamera()">Take a Picture 📷</button>
+      <button class="btn" onclick="openLibrary()">Upload from Library 📁</button>
     </div>
+
     <img id="previewImage" style="width:100%; margin-top:1rem; border-radius:8px; display:none;" />
+
     <div class="btn-container">
       <button id="extractBtn" class="btn" disabled>Extract Title</button>
     </div>
+
     <div id="recognizedTitle" style="margin-top: 1rem;"></div>
   </main>
+
   <div class="notification" id="notification"></div>
 
-  <script>
-    const uploadInput = document.getElementById("uploadInput");
-    const previewImage = document.getElementById("previewImage");
-    const extractBtn = document.getElementById("extractBtn");
-    const recognizedTitle = document.getElementById("recognizedTitle");
-    const notification = document.getElementById("notification");
-
-    uploadInput.addEventListener("change", (e) => {
-      const file = e.target.files[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = () => {
-          previewImage.src = reader.result;
-          previewImage.style.display = "block";
-          extractBtn.disabled = false;
-        };
-        reader.readAsDataURL(file);
-      }
-    });
-
-    extractBtn.addEventListener("click", async () => {
-      if (!previewImage.src) {
-        showNotification("Please upload an image first.");
-        return;
-      }
-
-      if (!navigator.onLine) {
-        showNotification("Offline mode: OCR not available.");
-        return;
-      }
-
-      showNotification("Sending image to Google OCR...");
-
-      const base64 = previewImage.src.split(",")[1];
-      const apiKey = "AIzaSyCLy5EwYvgGQUSlTuXKyO0-A6pnKQCoIQY"; // Replace this with your actual API key
-
-      try {
-        const response = await fetch(
-          "/proxy-google-vision", // Replace with your proxy backend URL in production
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              image: base64,
-              key: apiKey,
-            }),
-          }
-        );
-
-        const data = await response.json();
-        const text =
-          data.responses?.[0]?.fullTextAnnotation?.text || "No text found.";
-        const firstLine = text.split("\n").find((line) => line.trim());
-        recognizedTitle.textContent = `Title: ${firstLine || "No text found"}`;
-        showNotification("Text extracted!");
-
-        // Optionally fetch book info
-        fetch(`https://openlibrary.org/search.json?title=${encodeURIComponent(firstLine)}`)
-          .then(res => res.json())
-          .then(bookData => {
-            if (bookData.docs?.[0]) {
-              const book = bookData.docs[0];
-              recognizedTitle.innerHTML += `<br><strong>Author:</strong> ${book.author_name?.join(', ') || 'Unknown'}<br><strong>Year:</strong> ${book.first_publish_year || 'Unknown'}`;
-            }
-          });
-      } catch (error) {
-        showNotification("Error during OCR: " + error.message);
-      }
-    });
-
-    function showNotification(message) {
-      notification.textContent = message;
-      notification.style.display = "block";
-      setTimeout(() => {
-        notification.style.display = "none";
-      }, 3000);
-    }
-
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("sw.js");
-    }
-  </script>
+  <script src="app.js"></script>
 </body>
 </html>
