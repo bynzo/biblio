@@ -4,8 +4,13 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Book Scanner</title>
+
+  <!-- PWA manifest & icons -->
   <link rel="manifest" href="manifest.json" />
   <link rel="icon" sizes="192x192" href="icon-192.png" />
+  <link rel="icon" sizes="512x512" href="icon-512.png" />
+
+  <!-- your CSS -->
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -14,28 +19,58 @@
   </header>
 
   <main>
-    <!-- hidden inputs for camera / file -->
-    <input type="file" accept="image/*" capture="environment" id="cameraInput" style="display:none" />
-    <input type="file" accept="image/*" id="uploadInput" style="display:none" />
+    <!-- Hidden file inputs for camera / library -->
+    <input
+      type="file"
+      accept="image/*"
+      capture="environment"
+      id="cameraInput"
+      style="display:none"
+    />
+    <input
+      type="file"
+      accept="image/*"
+      id="uploadInput"
+      style="display:none"
+    />
 
+    <!-- Buttons to trigger those inputs -->
     <div class="btn-container">
-      <button class="btn" onclick="openCamera()">Take a Picture 📷</button>
-      <button class="btn" onclick="openLibrary()">Upload from Library 📁</button>
+      <button class="btn" onclick="openCamera()">
+        Take a Picture 📷
+      </button>
+      <button class="btn" onclick="openLibrary()">
+        Upload from Library 📁
+      </button>
     </div>
 
-    <img id="previewImage" class="preview" />
+    <!-- Preview of selected image -->
+    <img
+      id="previewImage"
+      class="preview"
+      style="display:none; width:100%; margin-top:1rem; border-radius:8px;"
+      alt="Selected book image preview"
+    />
 
-    <div class="btn-container">
-      <button id="extractBtn" class="btn" disabled>Extract Title</button>
-      <button id="showLibBtn" class="btn">Show Library</button>
+    <!-- OCR & Library controls -->
+    <div class="btn-container" style="margin-top:1rem">
+      <button id="extractBtn" class="btn" disabled>
+        Extract Title
+      </button>
+      <button id="showLibBtn" class="btn">
+        Show Library
+      </button>
     </div>
 
-    <div id="recognizedTitle" class="result"></div>
+    <!-- OCR result & notifications -->
+    <div id="recognizedTitle" class="result" style="margin-top:1rem;"></div>
     <div id="notification" class="notification"></div>
 
-    <div id="libraryList" class="library-list"></div>
+    <!-- Library list container (populated by app.js) -->
+    <div id="libraryList" class="library-list" style="display:none;"></div>
   </main>
 
+  <!-- Your application logic -->
   <script src="app.js"></script>
 </body>
 </html>
