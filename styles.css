@@ -102,6 +102,40 @@ header {
   margin-bottom: 0.25rem;
   font-size: 1rem;
 }
+.library-list {
+  margin: 1rem;
+}
+.book-item {
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  padding: 0.75rem;
+  margin-bottom: 0.75rem;
+  background: #fff;
+}
+.book-item h3 {
+  margin: 0 0 0.25rem;
+}
+.book-item p {
+  margin: 0.25rem 0;
+  font-size: 0.9rem;
+}
+.book-controls {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+.book-controls button {
+  flex: 1;
+  padding: 0.4rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.book-controls label {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.9rem;
+}
 
 .book-item p {
   margin-left: 1rem;
