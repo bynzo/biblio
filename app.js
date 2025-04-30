@@ -5,19 +5,24 @@ const LIB_KEY     = "biblioLibrary";
 const OCR_CACHE   = "ocrCache";
 
 // ——— DOM refs ———
-const cameraInput  = document.getElementById("cameraInput");
-const uploadInput  = document.getElementById("uploadInput");
-const previewImage = document.getElementById("previewImage");
-const extractBtn   = document.getElementById("extractBtn");
-const manualBtn    = document.getElementById("manualBtn");
-const libraryList  = document.getElementById("libraryList");
-const addBooksBtn  = document.getElementById("addBooksBtn");
-const backBtn      = document.getElementById("backBtn");
-const notification = document.getElementById("notification");
-const loadingOv    = document.getElementById("loadingOverlay");
+const cameraTile    = document.getElementById("cameraTile");
+const libraryTile   = document.getElementById("libraryTile");
+const manualBtn     = document.getElementById("manualBtn");
+const backBtn       = document.getElementById("backBtn");
+const previewImage  = document.getElementById("previewImage");
+const extractBtn    = document.getElementById("extractBtn");
+const manualForm    = document.getElementById("manualForm");
+const manualTitle   = document.getElementById("manualTitle");
+const manualAuthor  = document.getElementById("manualAuthor");
+const manualYear    = document.getElementById("manualYear");
+const manualSaveBtn = document.getElementById("manualSaveBtn");
+const manualCancelBtn = document.getElementById("manualCancelBtn");
+const loadingOv     = document.getElementById("loadingOverlay");
+const notification  = document.getElementById("notification");
+const libraryList   = document.getElementById("libraryList");
 
 // ——— Storage helpers ———
-const getLibrary  = () => JSON.parse(localStorage.getItem(LIB_KEY) || "[]");
+const getLibrary  = () => JSON.parse(localStorage.getItem(LIB_KEY)   || "[]");
 const saveLibrary = l => localStorage.setItem(LIB_KEY, JSON.stringify(l));
 const getCache    = () => JSON.parse(localStorage.getItem(OCR_CACHE) || "{}");
 const saveCache   = c => localStorage.setItem(OCR_CACHE, JSON.stringify(c));
@@ -30,17 +35,16 @@ function showNotification(msg) {
 }
 
 // ——— Navigation Buttons ———
-if (addBooksBtn) {
-  addBooksBtn.onclick = () => location.href = "scan.html";
-}
 if (backBtn) {
   backBtn.onclick = () => location.href = "index.html";
 }
 
-// ——— Library Rendering ———
+// ——— Library Page ———
 if (libraryList) {
+  document.getElementById("addBooksBtn")?.onclick = () => location.href = "scan.html";
   renderLibrary();
 }
+
 function renderLibrary() {
   const lib = getLibrary();
   libraryList.innerHTML = "";
@@ -51,7 +55,6 @@ function renderLibrary() {
   lib.forEach((book, i) => {
     const card = document.createElement("div");
     card.className = "book-item" + (book.read ? " read" : "");
-
     card.innerHTML = `
       <div class="book-details">
         <h3>${book.title}</h3>
@@ -61,7 +64,7 @@ function renderLibrary() {
       <div class="book-controls">
         <button class="edit-btn">Edit</button>
         <button class="delete-btn">Delete</button>
-        <button class="toggle-read">${book.read ? "Mark Unread" : "Mark Read"}</button>
+        <button class="toggle-read">${book.read?"Mark Unread":"Mark Read"}</button>
         <div class="rating"></div>
       </div>
     `;
@@ -69,7 +72,7 @@ function renderLibrary() {
 
     // Delete
     card.querySelector(".delete-btn").onclick = () => {
-      lib.splice(i, 1);
+      lib.splice(i,1);
       saveLibrary(lib);
       renderLibrary();
     };
@@ -81,7 +84,7 @@ function renderLibrary() {
     };
     // Rating
     const stars = card.querySelector(".rating");
-    for (let n = 1; n <= 5; n++) {
+    for (let n=1; n<=5; n++) {
       const s = document.createElement("span");
       s.textContent = n <= book.rating ? "★" : "☆";
       s.className = n <= book.rating ? "filled" : "empty";
@@ -93,8 +96,7 @@ function renderLibrary() {
       stars.appendChild(s);
     }
     // Edit
-    card.querySelector(".edit-btn").onclick = () =>
-      enterEdit(card, book, i);
+    card.querySelector(".edit-btn").onclick = () => enterEdit(card, book, i);
   });
 }
 
@@ -128,13 +130,22 @@ function enterEdit(card, book, idx) {
   form.querySelector(".cancel-btn").onclick = () => renderLibrary();
 }
 
-// ——— Scan & OCR Flow ———
+// ——— Scan Page ———
 if (extractBtn) {
-  // picker functions
-  window.openCamera  = () => cameraInput.click();
-  window.openLibrary = () => uploadInput.click();
+  // Hide manual form initially
+  manualForm.style.display = "none";
 
-  // when user picks/takes a photo:
+  // Tile wiring
+  cameraTile.onclick  = () => cameraInput.click();
+  libraryTile.onclick = () => uploadInput.click();
+  manualBtn.onclick   = () => {
+    previewImage.style.display = "none";
+    extractBtn.style.display   = "none";
+    manualForm.style.display   = "block";
+  };
+  backBtn.classList.add("link-btn");
+
+  // File pickers
   [cameraInput, uploadInput].forEach(inp => {
     inp.onchange = e => {
       const f = e.target.files[0];
@@ -143,15 +154,14 @@ if (extractBtn) {
       reader.onload = () => {
         previewImage.src = reader.result;
         previewImage.style.display = "block";
-        // reveal & enable Extract Info
-        extractBtn.style.display = "inline-block";
-        extractBtn.disabled = false;
+        extractBtn.style.display   = "block";
+        manualForm.style.display   = "none";
       };
       reader.readAsDataURL(f);
     };
   });
 
-  // core Extract Info handler
+  // Extract button
   extractBtn.onclick = async () => {
     extractBtn.disabled = true;
     const orig = extractBtn.textContent;
@@ -159,90 +169,90 @@ if (extractBtn) {
     loadingOv.classList.add("show");
 
     try {
-      // 1) OCR (with local cache)
-      const b64    = previewImage.src.split(",")[1];
-      const cache  = getCache();
-      let lines    = cache[b64];
+      // OCR + cache
+      const b64 = previewImage.src.split(",")[1];
+      const cache = getCache();
+      let lines = cache[b64];
       if (!lines) {
-        const ocrRes = await fetch(BACKEND_URL, {
+        const r = await fetch(BACKEND_URL, {
           method: "POST",
           headers: {"Content-Type":"application/json"},
-          body: JSON.stringify({ image: b64 })
+          body: JSON.stringify({image: b64})
         });
-        if (!ocrRes.ok) throw new Error("OCR failed");
-        const ocrJ = await ocrRes.json();
-        const raw  = ocrJ.fullTextAnnotation?.text || ocrJ.text || "";
-        lines = raw.split("\n").map(l => l.trim()).filter(l => l);
+        const ocr = await r.json();
+        const raw = ocr.fullTextAnnotation?.text || ocr.text || "";
+        lines = raw.split("\n").map(x=>x.trim()).filter(x=>x);
         cache[b64] = lines;
         saveCache(cache);
       }
 
-      // 2) GPT‐filter
+      // LLM filter
       let titles;
       try {
-        const fRes = await fetch(FILTER_URL, {
+        const r = await fetch(FILTER_URL, {
           method: "POST",
           headers: {"Content-Type":"application/json"},
-          body: JSON.stringify({ text: lines.join("\n") })
+          body: JSON.stringify({text: lines.join("\n")})
         });
-        const fJ = await fRes.json();
-        titles = Array.isArray(fJ.titles) ? fJ.titles : [fJ.title || ""];
-      } catch (_) {
+        const j = await r.json();
+        titles = Array.isArray(j.titles) ? j.titles : [j.title||""];
+      } catch(_) {
         titles = lines;
       }
 
-      // 3) lookup + add each
+      // Add to library
       const lib = getLibrary();
       let added = false;
       for (let t of titles) {
         t = t.trim();
-        if (!t || lib.some(b => b.title.toLowerCase() === t.toLowerCase()))
-          continue;
-
-        let author = "Unknown", year = "Unknown";
+        if (!t || lib.some(b=>b.title.toLowerCase()===t.toLowerCase())) continue;
+        // lookup
+        let author="Unknown", year="Unknown";
         try {
-          const olRes = await fetch(
+          const r = await fetch(
             `https://openlibrary.org/search.json?title=${encodeURIComponent(t)}&limit=1`
           );
-          const olJ = await olRes.json();
-          const d = olJ.docs?.[0];
+          const j = await r.json();
+          const d = j.docs?.[0];
           if (d) {
-            author = d.author_name?.join(", ") || author;
-            year   = d.first_publish_year || year;
+            author = d.author_name?.join(", ")||author;
+            year   = d.first_publish_year||year;
           }
-        } catch (_) {}
-        lib.push({ title: t, author, year, read:false, rating:0 });
+        } catch(_) {}
+        lib.push({title:t,author,year,read:false,rating:0});
         added = true;
       }
-
       if (added) {
         saveLibrary(lib);
         showNotification("✅ Added new book(s)!");
       } else {
         showNotification("ℹ️ No new books found.");
       }
-    } catch (err) {
-      console.error(err);
-      showNotification("❌ " + err.message);
+    } catch (e) {
+      console.error(e);
+      showNotification("❌ " + e.message);
     } finally {
       extractBtn.disabled = false;
       extractBtn.textContent = orig;
       loadingOv.classList.remove("show");
     }
   };
-}
 
-// ——— Manual‐Entry Flow ———
-if (manualBtn) {
-  manualBtn.onclick = () => {
-    const title  = prompt("Enter book title:")?.trim();
-    if (!title) return;
-    const author = prompt("Enter author name:", "Unknown")?.trim() || "Unknown";
-    const year   = prompt("Enter publication year:", "Unknown")?.trim() || "Unknown";
+  // Manual Save / Cancel
+  manualSaveBtn.onclick = () => {
+    const t = manualTitle.value.trim();
+    if (!t) return showNotification("Please enter a title.");
+    const author = manualAuthor.value.trim() || "Unknown";
+    const year   = manualYear.value.trim()   || "Unknown";
     const lib = getLibrary();
-    lib.push({ title, author, year, read:false, rating:0 });
+    lib.push({title:t,author,year,read:false,rating:0});
     saveLibrary(lib);
-    showNotification("📚 Added manually");
+    showNotification("✅ Added manually!");
+    manualForm.style.display = "none";
+    location.href = "index.html";
+  };
+  manualCancelBtn.onclick = () => {
+    manualForm.style.display = "none";
   };
 }
 
