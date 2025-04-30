@@ -42,6 +42,7 @@ function openLibrary() { uploadInput.click(); }
 
 [cameraInput, uploadInput].forEach(input => {
   input.addEventListener("change", e => {
+    console.log("🖼️ File selected:", e.target.files[0]?.name);
     const file = e.target.files[0];
     if (!file) return;
     const reader = new FileReader();
@@ -50,6 +51,7 @@ function openLibrary() { uploadInput.click(); }
       previewImage.style.display = "block";
       extractBtn.disabled = false;
       recognizedTitle.textContent = "";
+      console.log("🖼️ Preview image loaded, extract ready");
     };
     reader.readAsDataURL(file);
   });
@@ -57,8 +59,12 @@ function openLibrary() { uploadInput.click(); }
 
 // === Extract Handler ===
 extractBtn.addEventListener("click", async () => {
+  console.log("🔍 Extract button clicked");
   const dataUrl = previewImage.src;
+  console.log("📸 Preview src starts with:", dataUrl?.slice(0,50));
+
   if (!dataUrl) {
+    console.warn("⚠️ No image selected yet!");
     showNotification("Please choose an image first.");
     return;
   }
@@ -70,25 +76,28 @@ extractBtn.addEventListener("click", async () => {
 
   try {
     const base64 = dataUrl.split(",")[1];
+    console.log("🔡 Base64 length:", base64.length);
 
     // 1) check OCR cache
     const ocrCache = getOcrCache();
     let title = ocrCache[base64];
+    console.log("📦 Cached OCR hit?", !!title);
 
     if (!title) {
       // 2) call backend using documentTextDetection
+      console.log("🛰️ Calling OCR backend at:", BACKEND_URL);
       const res = await fetch(BACKEND_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ image: base64 })
       });
 
-      if (!res.ok) {
-        throw new Error(`Server returned ${res.status}`);
-      }
+      console.log("⚙️ fetch() returned status", res.status);
+      const raw = await res.text();
+      console.log("📥 Raw response text:", raw);
 
-      // response shape: { text: "full detected text…" }
-      const { text: fullText = "" } = await res.json();
+      const { text: fullText = "" } = JSON.parse(raw);
+      console.log("📄 Parsed fullText:", fullText);
 
       // 3) parse first non-empty line
       title = fullText
@@ -97,6 +106,7 @@ extractBtn.addEventListener("click", async () => {
         .find(l => l.length > 0);
 
       if (!title) {
+        console.warn("⚠️ No parsed title found");
         showNotification("No text found in image.");
         return;
       }
@@ -104,18 +114,22 @@ extractBtn.addEventListener("click", async () => {
       // 4) cache OCR result
       ocrCache[base64] = title;
       saveOcrCache(ocrCache);
+      console.log("💾 OCR result cached for this image");
     }
 
+    console.log("🏷️ Final extracted title:", title);
     recognizedTitle.innerHTML = `<strong>Title:</strong> ${title}`;
 
     // 5) check library duplicate
     const library = getLibrary();
     if (library.some(b => b.title.toLowerCase() === title.toLowerCase())) {
+      console.log("📚 Duplicate book, not adding");
       showNotification("This book is already in your library.");
       return;
     }
 
     // 6) fetch book details from OpenLibrary
+    console.log("🔍 Looking up book details online:", title);
     const lookup = await fetch(
       `https://openlibrary.org/search.json?title=${encodeURIComponent(title)}&limit=1`
     ).then(r => r.json());
@@ -126,35 +140,42 @@ extractBtn.addEventListener("click", async () => {
       author: doc.author_name?.join(", ") || "Unknown",
       year: doc.first_publish_year || "Unknown"
     };
+    console.log("📖 Book details fetched:", book);
 
     // 7) save to library
     library.push(book);
     saveLibrary(library);
+    console.log("✅ Book saved to library");
     showNotification("Book added to library!");
   } catch (err) {
-    console.error(err);
+    console.error("💥 Error during OCR fetch:", err);
     showNotification("Error: " + err.message);
   } finally {
     extractBtn.disabled = false;
     extractBtn.textContent = origText;
+    console.log("🔄 Extract button re-enabled");
   }
 });
 
 // === Show / Hide Library ===
 showLibBtn.addEventListener("click", () => {
+  console.log("📂 Toggle library view");
   const lib = getLibrary();
   libraryList.innerHTML = "";
 
   if (libraryList.style.display === "block") {
     libraryList.style.display = "none";
     showLibBtn.textContent = "Show Library";
+    console.log("📂 Library hidden");
     return;
   }
 
   showLibBtn.textContent = "Hide Library";
   libraryList.style.display = "block";
+  console.log("📂 Library shown");
 
   if (lib.length === 0) {
+    console.log("📂 Library is empty");
     libraryList.textContent = "Your library is empty.";
     return;
   }
@@ -173,5 +194,7 @@ showLibBtn.addEventListener("click", () => {
 
 // === Service Worker ===
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("sw.js");
+  navigator.serviceWorker.register("sw.js")
+    .then(() => console.log("🛠️ Service worker registered"))
+    .catch(err => console.error("🛠️ SW registration failed:", err));
 }
