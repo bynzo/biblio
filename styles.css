@@ -157,3 +157,7 @@ button.cancel-btn  { background: var(--light-gray); color: var(--text-color); }
 .rating .empty {
   color: var(--light-gray);
 }
+#cameraInput,
+#uploadInput {
+  display: none;
+}
