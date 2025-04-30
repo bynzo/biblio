@@ -1,24 +1,20 @@
-// === Debug notice on load ===
-console.log("🟢 app.js loaded");
-
 // === Config & Keys ===
-const BACKEND_URL     = "https://biblio-c1en.onrender.com/proxy-google-vision";
-const LIB_KEY         = "biblioLibrary";
-const OCR_CACHE_KEY   = "ocrCache";
+const BACKEND_URL = "https://biblio-c1en.onrender.com/proxy-google-vision";
+const LIB_KEY = "biblioLibrary";
+const OCR_CACHE_KEY = "ocrCache";
 
 // === DOM refs ===
-const cameraInput     = document.getElementById("cameraInput");
-const uploadInput     = document.getElementById("uploadInput");
-const previewImage    = document.getElementById("previewImage");
-const extractBtn      = document.getElementById("extractBtn");
-const showLibBtn      = document.getElementById("showLibBtn");
+const cameraInput   = document.getElementById("cameraInput");
+const uploadInput   = document.getElementById("uploadInput");
+const previewImage  = document.getElementById("previewImage");
+const extractBtn    = document.getElementById("extractBtn");
+const showLibBtn    = document.getElementById("showLibBtn");
 const recognizedTitle = document.getElementById("recognizedTitle");
 const notification    = document.getElementById("notification");
 const libraryList     = document.getElementById("libraryList");
 
 // === Helpers ===
 function showNotification(msg) {
-  console.log("🔔", msg);
   notification.textContent = msg;
   notification.style.display = "block";
   setTimeout(() => notification.style.display = "none", 3000);
@@ -39,7 +35,7 @@ function saveOcrCache(cache) {
 }
 
 // === File pickers ===
-function openCamera()  { cameraInput.click(); }
+function openCamera() { cameraInput.click(); }
 function openLibrary() { uploadInput.click(); }
 
 [cameraInput, uploadInput].forEach(input => {
@@ -53,7 +49,7 @@ function openLibrary() { uploadInput.click(); }
       previewImage.style.display = "block";
       extractBtn.disabled = false;
       recognizedTitle.textContent = "";
-      console.log("✅ Preview ready, extract enabled");
+      console.log("🖼️ Preview image loaded, extract ready");
     };
     reader.readAsDataURL(file);
   });
@@ -61,106 +57,109 @@ function openLibrary() { uploadInput.click(); }
 
 // === Extract Handler ===
 extractBtn.addEventListener("click", async () => {
-  console.log("🚀 Extract button clicked");
-  const origText = extractBtn.textContent;
+  const dataUrl = previewImage.src;
+  if (!dataUrl) {
+    showNotification("Please choose an image first.");
+    return;
+  }
+
   extractBtn.disabled = true;
+  const origText = extractBtn.textContent;
   extractBtn.textContent = "Scanning…";
 
   try {
-    if (!previewImage.src) {
-      throw new Error("No image to scan");
-    }
-    // get Base64
-    const base64 = previewImage.src.split(",")[1];
-    console.log("🔡 Base64 size:", base64.length);
+    // strip off the data:// prefix
+    const base64 = dataUrl.split(",")[1];
+    console.log("🔡 Base64 length:", base64.length);
 
-    // OCR cache?
+    // 1) OCR cache lookup
     const cache = getOcrCache();
     let lines = cache[base64];
     if (lines) {
-      console.log("📦 Using cached lines:", lines);
+      // if somehow we stored a raw string, convert back to array
+      if (typeof lines === "string") {
+        console.warn("⚠️ OCR cache entry was a string, converting to array");
+        lines = lines
+          .split("\n")
+          .map(l => l.trim())
+          .filter(l => l);
+      }
+      console.log("📦 Cached OCR hit, lines:", lines);
     } else {
-      // call your backend
-      console.log("🌐 Sending to OCR backend:", BACKEND_URL);
-      const resp = await fetch(BACKEND_URL, {
+      // 2) call backend
+      console.log("🛰️ Calling OCR backend at:", BACKEND_URL);
+      const res = await fetch(BACKEND_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ image: base64 })
       });
-      console.log("📶 Backend response status:", resp.status);
-      if (!resp.ok) throw new Error(`OCR API returned ${resp.status}`);
+      if (!res.ok) throw new Error(`Server returned ${res.status}`);
+      const data = await res.json();
+      console.log("📥 Raw response:", data);
 
-      const json = await resp.json();
-      console.log("📋 OCR JSON:", json);
+      // pull out the actual text
+      const fullText = data.fullTextAnnotation?.text || data.text || "";
+      console.log("📄 Parsed fullText:", fullText);
 
-      // grab whichever text field exists
-      const raw =
-        json.text
-        || json.fullTextAnnotation?.text
-        || json.textAnnotations?.[0]?.description
-        || "";
-      console.log("✂️ raw OCR text:", raw);
-
-      // split into every non-empty line
-      lines = raw
+      // split into non-empty lines
+      lines = fullText
         .split("\n")
         .map(l => l.trim())
         .filter(l => l);
-      console.log("📑 parsed lines:", lines);
 
+      if (lines.length === 0) {
+        showNotification("No text found in image.");
+        return;
+      }
+
+      // cache it
       cache[base64] = lines;
       saveOcrCache(cache);
-      console.log("✅ Cached parsed lines");
+      console.log("💾 Saved to OCR cache");
     }
 
-    // now process each title
+    // 3) Process each title line
     const library = getLibrary();
-    let added = 0;
+    let addedAny = false;
 
     for (const title of lines) {
-      console.log("🔍 Checking title:", title);
-      // skip if exact duplicate
+      console.log("🌟 Processing title:", title);
+      // skip exact duplicates
       if (library.some(b => b.title.toLowerCase() === title.toLowerCase())) {
         console.log("⚠️ Already in library, skipping:", title);
         continue;
       }
 
-      // fetch OpenLibrary data but don't fail if none
-      let author = "", year = "";
+      // 4) lookup OpenLibrary
+      let author = "Unknown", year = "Unknown";
       try {
         const lookup = await fetch(
           `https://openlibrary.org/search.json?title=${encodeURIComponent(title)}&limit=1`
         ).then(r => r.json());
-        if (lookup.docs && lookup.docs.length) {
-          const d = lookup.docs[0];
-          author = d.author_name?.join(", ") || "";
-          year   = d.first_publish_year || "";
-          console.log("📚 Found OL info for", title, { author, year });
-        } else {
-          console.log("⚠️ No OL data for", title);
+        const doc = lookup.docs?.[0];
+        if (doc) {
+          author = doc.author_name?.join(", ") || author;
+          year   = doc.first_publish_year || year;
         }
-      } catch (olErr) {
-        console.warn("❌ OL lookup failed for", title, olErr);
+      } catch (e) {
+        console.warn("⚠️ OpenLibrary lookup failed for", title, e);
       }
 
-      // push the book even if author/year are blank
-      library.push({ title, author, year });
-      added++;
-      console.log("➕ Added to library:", title);
+      const book = { title, author, year };
+      library.push(book);
+      addedAny = true;
+      console.log("✅ Added book:", book);
     }
 
-    if (added) {
+    if (addedAny) {
       saveLibrary(library);
-      showNotification(`Added ${added} new book${added>1?"s":""}!`);
+      showNotification("Books added to library!");
     } else {
-      showNotification("No new titles to add");
+      showNotification("No new books were added.");
     }
-
-    // show all scanned lines in the UI
-    recognizedTitle.innerHTML = `<strong>Scanned titles:</strong><br>${lines.join("<br>")}`;
 
   } catch (err) {
-    console.error("❗ Extraction error", err);
+    console.error(err);
     showNotification("Error: " + err.message);
   } finally {
     extractBtn.disabled = false;
@@ -170,31 +169,39 @@ extractBtn.addEventListener("click", async () => {
 
 // === Show / Hide Library ===
 showLibBtn.addEventListener("click", () => {
-  console.log("📂 Toggling library view");
   const lib = getLibrary();
+  libraryList.innerHTML = "";
 
   if (libraryList.style.display === "block") {
     libraryList.style.display = "none";
-    showLibBtn.textContent = "Show Library";
+    showLibBtn.textContent     = "Show Library";
     return;
   }
 
-  libraryList.innerHTML = "";
+  showLibBtn.textContent     = "Hide Library";
+  libraryList.style.display  = "block";
+
   if (lib.length === 0) {
     libraryList.textContent = "Your library is empty.";
-  } else {
-    lib.forEach((b,i) => {
-      const card = document.createElement("div");
-      card.className = "book-item";
-      card.innerHTML = `
-        <h3>${b.title}</h3>
-        <p><strong>Author:</strong> ${b.author||"—"}</p>
-        <p><strong>Year:</strong> ${b.year||"—"}</p>
-      `;
-      libraryList.appendChild(card);
-    });
+    return;
   }
 
-  libraryList.style.display = "block";
-  showLibBtn.textContent = "Hide Library";
+  // render each book
+  lib.forEach(b => {
+    const div = document.createElement("div");
+    div.className = "book-item";
+    div.innerHTML = `
+      <h3>${b.title}</h3>
+      <p><strong>Author:</strong> ${b.author}</p>
+      <p><strong>Year:</strong> ${b.year}</p>
+    `;
+    libraryList.appendChild(div);
+  });
 });
+
+// === Service Worker ===
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("sw.js")
+    .then(() => console.log("🛠️ Service worker registered"))
+    .catch(e => console.warn("SW failed:", e));
+}
