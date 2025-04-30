@@ -3,15 +3,15 @@ const BACKEND_URL   = "https://biblio-c1en.onrender.com/proxy-google-vision";
 const LIB_KEY       = "biblioLibrary";
 const OCR_CACHE_KEY = "ocrCache";
 
-// === DOM refs ===
-const cameraInput     = document.getElementById("cameraInput");
-const uploadInput     = document.getElementById("uploadInput");
-const previewImage    = document.getElementById("previewImage");
-const extractBtn      = document.getElementById("extractBtn");
-const showLibBtn      = document.getElementById("showLibBtn");
-const recognizedTitle = document.getElementById("recognizedTitle");
-const notification    = document.getElementById("notification");
-const libraryList     = document.getElementById("libraryList");
+// === DOM refs (may not exist on every page!) ===
+const cameraInput  = document.getElementById("cameraInput");
+const uploadInput  = document.getElementById("uploadInput");
+const previewImage = document.getElementById("previewImage");
+const extractBtn   = document.getElementById("extractBtn");
+const notification = document.getElementById("notification");
+const libraryList  = document.getElementById("libraryList");
+const addBooksBtn  = document.getElementById("addBooksBtn");
+const backBtn      = document.getElementById("backBtn");
 
 // === Storage Helpers ===
 const getLibrary  = () => JSON.parse(localStorage.getItem(LIB_KEY)   || "[]");
@@ -26,125 +26,23 @@ function showNotification(msg) {
   setTimeout(() => notification.style.display = "none", 3000);
 }
 
-// === File Pickers ===
-function openCamera()  { cameraInput.click(); }
-function openLibrary() { uploadInput.click(); }
+// ————— Library Page Logic —————
+if (libraryList) {
+  // render on load
+  renderLibrary();
 
-[cameraInput, uploadInput].forEach(input => {
-  input.addEventListener("change", e => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      previewImage.src = reader.result;
-      previewImage.style.display = "block";
-      extractBtn.disabled = false;
-      recognizedTitle.textContent = "";
-    };
-    reader.readAsDataURL(file);
-  });
-});
-
-// === OCR & Book Addition ===
-extractBtn.addEventListener("click", async () => {
-  const dataUrl = previewImage.src;
-  if (!dataUrl) {
-    showNotification("Please select an image first.");
-    return;
+  // wire up FAB (if present)
+  if (addBooksBtn) {
+    addBooksBtn.addEventListener("click", () => {
+      window.location.href = "scan.html";
+    });
   }
+}
 
-  // disable while scanning
-  extractBtn.disabled = true;
-  const origText = extractBtn.textContent;
-  extractBtn.textContent = "Scanning…";
-
-  try {
-    const base64 = dataUrl.split(",")[1];
-    const cache = getCache();
-
-    // 1) Check cache for this image
-    let title = cache[base64];
-
-    if (!title) {
-      // 2) Send to backend
-      const res = await fetch(BACKEND_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image: base64 })
-      });
-      if (!res.ok) {
-        throw new Error(`Server returned ${res.status}`);
-      }
-
-      // 3) Read distilled title
-      const { rawText, title: llmTitle } = await res.json();
-      title = llmTitle?.trim();
-
-      if (!title) {
-        console.warn("Raw OCR was:\n", rawText);
-        showNotification("No title found. Try a clearer shot.");
-        return;
-      }
-
-      // 4) Cache it
-      cache[base64] = title;
-      saveCache(cache);
-    }
-
-    // Show it in the UI
-    recognizedTitle.innerHTML = `<strong>Detected Title:</strong> ${title}`;
-
-    // 5) Add to library if not already present
-    const library = getLibrary();
-    if (library.some(b => b.title.toLowerCase() === title.toLowerCase())) {
-      showNotification("This book is already in your library.");
-    } else {
-      // 6) Lookup author/year via OpenLibrary
-      let author = "Unknown", year = "Unknown";
-      try {
-        const lookup = await fetch(
-          `https://openlibrary.org/search.json?title=${encodeURIComponent(title)}&limit=1`
-        ).then(r => r.json());
-        const doc = lookup.docs?.[0];
-        if (doc) {
-          author = (doc.author_name || []).join(", ") || author;
-          year   = doc.first_publish_year || year;
-        }
-      } catch (e) {
-        console.warn("OpenLibrary lookup failed for:", title, e);
-      }
-
-      library.push({ title, author, year, read: false, rating: 0 });
-      saveLibrary(library);
-      renderLibrary();
-      showNotification("Book added to library!");
-    }
-
-  } catch (err) {
-    console.error("OCR error:", err);
-    showNotification("Error: " + err.message);
-  } finally {
-    extractBtn.disabled = false;
-    extractBtn.textContent = origText;
-  }
-});
-
-// === Show / Hide Library ===
-showLibBtn.addEventListener("click", () => {
-  if (libraryList.style.display === "block") {
-    libraryList.style.display = "none";
-    showLibBtn.textContent = "Show Library";
-  } else {
-    libraryList.style.display = "block";
-    showLibBtn.textContent = "Hide Library";
-    renderLibrary();
-  }
-});
-
-// === Render Library ===
 function renderLibrary() {
-  libraryList.innerHTML = "";
   const lib = getLibrary();
+  libraryList.innerHTML = "";
+
   if (!lib.length) {
     libraryList.textContent = "Your library is empty.";
     return;
@@ -153,18 +51,18 @@ function renderLibrary() {
   lib.forEach((b, idx) => {
     const item = document.createElement("div");
     item.className = "book-item" + (b.read ? " read" : "");
-    item.dataset.index = idx;
-
     item.innerHTML = `
       <div class="book-details">
-        <h3 class="book-title">${b.title}</h3>
-        <p><strong>Author:</strong> <span class="book-author">${b.author}</span></p>
-        <p><strong>Year:</strong> <span class="book-year">${b.year}</span></p>
+        <h3>${b.title}</h3>
+        <p><strong>Author:</strong> ${b.author}</p>
+        <p><strong>Year:</strong> ${b.year}</p>
       </div>
       <div class="book-controls">
         <button class="edit-btn">Edit</button>
         <button class="delete-btn">Delete</button>
-        <button class="toggle-read">${b.read ? "Mark Unread" : "Mark Read"}</button>
+        <button class="toggle-read">
+          ${b.read ? "Mark Unread" : "Mark Read"}
+        </button>
         <div class="rating"></div>
       </div>
     `;
@@ -188,36 +86,28 @@ function renderLibrary() {
     const ratingDiv = item.querySelector(".rating");
     for (let i = 1; i <= 5; i++) {
       const star = document.createElement("span");
-      star.innerText = i <= b.rating ? "★" : "☆";
-      star.className = i <= b.rating ? "filled" : "empty";
-      star.dataset.value = i;
+      star.textContent = i <= b.rating ? "★" : "☆";
+      star.className   = i <= b.rating ? "filled" : "empty";
       star.addEventListener("click", () => {
-        b.rating = Number(star.dataset.value);
+        b.rating = i;
         saveLibrary(lib);
         renderLibrary();
       });
       ratingDiv.appendChild(star);
     }
 
-    // Edit in-place
+    // Edit
     item.querySelector(".edit-btn").addEventListener("click", () => {
       enterEditMode(item, b, idx);
     });
   });
 }
 
-// === Edit Mode ===
 function enterEditMode(item, book, idx) {
-  const titleEl  = item.querySelector(".book-title");
-  const authorEl = item.querySelector(".book-author");
-  const yearEl   = item.querySelector(".book-year");
+  const details = item.querySelector(".book-details");
   const controls = item.querySelector(".book-controls");
+  details.style.display = controls.style.display = "none";
 
-  // Hide details + controls
-  titleEl.style.display = authorEl.style.display = yearEl.style.display = "none";
-  controls.style.display = "none";
-
-  // Build form
   const form = document.createElement("div");
   form.className = "edit-form";
   form.innerHTML = `
@@ -231,7 +121,6 @@ function enterEditMode(item, book, idx) {
   `;
   item.appendChild(form);
 
-  // Save
   form.querySelector(".save-btn").addEventListener("click", () => {
     book.title  = form.querySelector(".edit-title").value.trim()  || book.title;
     book.author = form.querySelector(".edit-author").value.trim() || book.author;
@@ -241,15 +130,101 @@ function enterEditMode(item, book, idx) {
     saveLibrary(lib);
     renderLibrary();
   });
-
-  // Cancel
   form.querySelector(".cancel-btn").addEventListener("click", () => {
     renderLibrary();
   });
 }
 
+// ————— Scan Page Logic —————
+if (extractBtn) {
+  // wire up file pickers
+  function openCamera()  { cameraInput.click(); }
+  function openLibrary() { uploadInput.click(); }
+  [cameraInput, uploadInput].forEach(inp => {
+    inp.addEventListener("change", e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        previewImage.src = reader.result;
+        previewImage.style.display = "block";
+        extractBtn.disabled = false;
+      };
+      reader.readAsDataURL(file);
+    });
+  });
+
+  // OCR & add books
+  extractBtn.addEventListener("click", async () => {
+    extractBtn.disabled = true;
+    const origText = extractBtn.textContent;
+    extractBtn.textContent = "Scanning…";
+
+    try {
+      const base64 = previewImage.src.split(",")[1];
+      let lines = getCache()[base64];
+      if (!lines) {
+        const res = await fetch(BACKEND_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ image: base64 })
+        });
+        if (!res.ok) throw new Error("Server returned " + res.status);
+        const js = await res.json();
+        const txt = js.fullTextAnnotation?.text || js.text || "";
+        lines = txt.split("\n").map(l => l.trim()).filter(l => l);
+        const cache = getCache();
+        cache[base64] = lines;
+        saveCache(cache);
+      }
+
+      const lib = getLibrary();
+      let added = false;
+      for (const title of lines) {
+        if (lib.some(b => b.title.toLowerCase() === title.toLowerCase())) {
+          continue;
+        }
+        // lookup OpenLibrary
+        let author = "Unknown", year = "Unknown";
+        try {
+          const look = await fetch(
+            `https://openlibrary.org/search.json?title=${encodeURIComponent(title)}&limit=1`
+          ).then(r => r.json());
+          const d = look.docs?.[0];
+          if (d) {
+            author = d.author_name?.join(", ") || author;
+            year   = d.first_publish_year || year;
+          }
+        } catch(e){/*ignore*/}
+        lib.push({ title, author, year, read: false, rating: 0 });
+        added = true;
+      }
+
+      if (added) {
+        saveLibrary(lib);
+        showNotification("Books added!");
+      } else {
+        showNotification("No new books.");
+      }
+
+    } catch (err) {
+      console.error(err);
+      showNotification("Error: " + err.message);
+    } finally {
+      extractBtn.disabled = false;
+      extractBtn.textContent = origText;
+    }
+  });
+}
+
+// Back‐button on scan page
+if (backBtn) {
+  backBtn.addEventListener("click", () => {
+    window.location.href = "index.html";
+  });
+}
+
 // === Service Worker ===
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("sw.js")
-    .catch(console.warn);
+  navigator.serviceWorker.register("sw.js").catch(console.warn);
 }
