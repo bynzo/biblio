@@ -4,24 +4,21 @@ const LIB_KEY       = "biblioLibrary";
 const OCR_CACHE_KEY = "ocrCache";
 
 // === DOM refs ===
-const cameraInput    = document.getElementById("cameraInput");
-const uploadInput    = document.getElementById("uploadInput");
-const previewImage   = document.getElementById("previewImage");
-const extractBtn     = document.getElementById("extractBtn");
-const showLibBtn     = document.getElementById("showLibBtn");
-const recognizedTitle= document.getElementById("recognizedTitle");
-const notification   = document.getElementById("notification");
-const libraryList    = document.getElementById("libraryList");
+const cameraInput     = document.getElementById("cameraInput");
+const uploadInput     = document.getElementById("uploadInput");
+const previewImage    = document.getElementById("previewImage");
+const extractBtn      = document.getElementById("extractBtn");
+const showLibBtn      = document.getElementById("showLibBtn");
+const recognizedTitle = document.getElementById("recognizedTitle");
+const notification    = document.getElementById("notification");
+const libraryList     = document.getElementById("libraryList");
 
-// === Expose global helpers for inline onclicks ===
-function openCamera()  { cameraInput.click(); }
-function openLibrary() { uploadInput.click(); }
-window.openCamera  = openCamera;
-window.openLibrary = openLibrary;
+// expose for inline buttons
+window.openCamera      = () => cameraInput.click();
+window.openLibrary     = () => uploadInput.click();
 
 // === Helpers ===
 function showNotification(msg) {
-  console.log("🔔", msg);
   notification.textContent = msg;
   notification.style.display = "block";
   setTimeout(() => notification.style.display = "none", 3000);
@@ -48,102 +45,81 @@ function saveOcrCache(cache) {
   input.addEventListener("change", e => {
     const file = e.target.files[0];
     if (!file) return;
-    console.log("🖼️ File selected:", file.name);
     const reader = new FileReader();
     reader.onload = () => {
       previewImage.src = reader.result;
       previewImage.style.display = "block";
       extractBtn.disabled = false;
       recognizedTitle.textContent = "";
-      console.log("🖼️ Preview image loaded, extract ready");
     };
     reader.readAsDataURL(file);
   });
 });
 
-// === Extract Handler ===
+// === OCR + Add Book ===
 extractBtn.addEventListener("click", async () => {
-  console.log("🔍 Extract button clicked");
   const dataUrl = previewImage.src;
   if (!dataUrl) {
     showNotification("Please choose an image first.");
     return;
   }
 
-  // disable while scanning
   extractBtn.disabled = true;
   const origText = extractBtn.textContent;
   extractBtn.textContent = "Scanning…";
 
   try {
-    console.log("📸 Preview src prefix:", dataUrl.slice(0,30) + "…");
     const base64 = dataUrl.split(",")[1];
-    console.log("🔡 Base64 length:", base64.length);
-
-    // 1) OCR cache
-    const ocrCache = getOcrCache();
-    let title = ocrCache[base64];
-    console.log("📦 Cached OCR hit?", Boolean(title));
+    const cache = getOcrCache();
+    let title = cache[base64];
 
     if (!title) {
-      // 2) call backend
-      console.log("🛰️ Calling OCR backend at:", BACKEND_URL);
       const res = await fetch(BACKEND_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ image: base64 })
       });
-      console.log("⚙️ fetch() returned status", res.status);
-      if (!res.ok) throw new Error(`Server returned ${res.status}`);
-
+      if (!res.ok) throw new Error(`Status ${res.status}`);
       const json = await res.json();
-      // support both our `result.text` and fullTextAnnotation.text
       const fullText = json.text
-                     || json.fullTextAnnotation?.text
-                     || "";
-      console.log("📥 Raw response snippet:", JSON.stringify(json).slice(0,200), "…");
-      console.log("📄 Parsed fullText:", fullText);
-
-      // 3) parse first non-empty line
+                    || json.fullTextAnnotation?.text
+                    || "";
       const lines = fullText
         .split("\n")
         .map(l => l.trim())
-        .filter(l => l.length > 0);
-
+        .filter(l => l.length);
       title = lines[0] || "";
-      console.log("📄 Extracted title:", title);
-
       if (!title) {
         showNotification("No text found in image.");
         return;
       }
-
-      // 4) cache OCR result
-      ocrCache[base64] = title;
-      saveOcrCache(ocrCache);
+      cache[base64] = title;
+      saveOcrCache(cache);
     }
 
     recognizedTitle.innerHTML = `<strong>Title:</strong> ${title}`;
 
-    // 5) duplicate check
+    // build new book object
     const library = getLibrary();
     if (library.some(b => b.title.toLowerCase() === title.toLowerCase())) {
       showNotification("This book is already in your library.");
       return;
     }
 
-    // 6) lookup on OpenLibrary
+    // fetch metadata
     const lookup = await fetch(
       `https://openlibrary.org/search.json?title=${encodeURIComponent(title)}&limit=1`
     ).then(r => r.json());
+
     const doc = lookup.docs?.[0] || {};
     const book = {
       title,
       author: doc.author_name?.join(", ") || "Unknown",
-      year:   doc.first_publish_year || "Unknown"
+      year:   doc.first_publish_year || "Unknown",
+      read:   false,
+      notes:  ""
     };
 
-    // 7) save to localStorage
     library.push(book);
     saveLibrary(library);
     showNotification("Book added to library!");
@@ -153,45 +129,81 @@ extractBtn.addEventListener("click", async () => {
     showNotification("Error: " + err.message);
   }
   finally {
-    extractBtn.disabled = false;
+    extractBtn.disabled  = false;
     extractBtn.textContent = origText;
   }
 });
 
-// === Show / Hide Library ===
-showLibBtn.addEventListener("click", () => {
+// === Library Rendering & Actions ===
+function renderLibrary() {
   const lib = getLibrary();
-  libraryList.innerHTML = "";
-
-  if (libraryList.style.display === "block") {
-    libraryList.style.display = "none";
-    showLibBtn.textContent = "Show Library";
-    return;
-  }
-
-  showLibBtn.textContent = "Hide Library";
-  libraryList.style.display = "block";
-
   if (lib.length === 0) {
-    libraryList.textContent = "Your library is empty.";
+    libraryList.innerHTML = `<p>Your library is empty.</p>`;
     return;
   }
 
-  lib.forEach(b => {
-    const div = document.createElement("div");
-    div.className = "book-item";
-    div.innerHTML = `
+  libraryList.innerHTML = lib.map((b,i) => `
+    <div class="book-item" data-index="${i}">
       <h3>${b.title}</h3>
       <p><strong>Author:</strong> ${b.author}</p>
       <p><strong>Year:</strong> ${b.year}</p>
-    `;
-    libraryList.appendChild(div);
-  });
+      <p><strong>Notes:</strong> ${b.notes || "<em>(none)</em>"}</p>
+      <div class="book-controls">
+        <label>
+          <input type="checkbox" class="read-checkbox" ${b.read ? "checked" : ""}>
+          Read
+        </label>
+        <button class="edit-note-btn">Edit Notes</button>
+        <button class="delete-btn">Delete</button>
+      </div>
+    </div>
+  `).join("");
+
+  // hook up all buttons & checkboxes
+  libraryList.querySelectorAll(".delete-btn")
+    .forEach(btn => btn.addEventListener("click", () => {
+      const idx = +btn.closest(".book-item").dataset.index;
+      const lib = getLibrary();
+      lib.splice(idx,1);
+      saveLibrary(lib);
+      renderLibrary();
+    }));
+
+  libraryList.querySelectorAll(".read-checkbox")
+    .forEach(cb => cb.addEventListener("change", () => {
+      const idx = +cb.closest(".book-item").dataset.index;
+      const lib = getLibrary();
+      lib[idx].read = cb.checked;
+      saveLibrary(lib);
+    }));
+
+  libraryList.querySelectorAll(".edit-note-btn")
+    .forEach(btn => btn.addEventListener("click", () => {
+      const idx = +btn.closest(".book-item").dataset.index;
+      const lib = getLibrary();
+      const newNotes = prompt("Edit notes for:\n" + lib[idx].title, lib[idx].notes);
+      if (newNotes !== null) {
+        lib[idx].notes = newNotes;
+        saveLibrary(lib);
+        renderLibrary();
+      }
+    }));
+}
+
+// Show/hide library
+showLibBtn.addEventListener("click", () => {
+  if (libraryList.style.display === "block") {
+    libraryList.style.display = "none";
+    showLibBtn.textContent = "Show Library";
+  } else {
+    renderLibrary();
+    libraryList.style.display = "block";
+    showLibBtn.textContent = "Hide Library";
+  }
 });
 
 // === Service Worker ===
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js")
-    .then(_ => console.log("🛠️ Service worker registered"))
-    .catch(err => console.error("SW registration failed:", err));
+    .catch(console.error);
 }
