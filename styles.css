@@ -1,121 +1,120 @@
 :root {
   --primary-color: #6200ee;
-  --primary-dark: #3700b3;
-  --secondary-color: #03dac6;
-  --background: #f5f5f5;
-  --card-bg: #ffffff;
-  --text-color: #333333;
-  --light-gray: #e0e0e0;
-  --success: #43a047;
-  --warning: #fb8c00;
-  --danger:  #e53935;
+  --primary-dark:  #3700b3;
+  --background:    #f5f5f5;
+  --card-bg:       #ffffff;
+  --text-color:    #333333;
+  --light-gray:    #e0e0e0;
+  --success:       #43a047;
+  --warning:       #fb8c00;
+  --danger:        #e53935;
 }
 
-/* Global resets */
 body {
-  background: var(--background);
-  color: var(--text-color);
   margin: 0;
   font-family: "Segoe UI", sans-serif;
+  background: var(--background);
+  color: var(--text-color);
 }
 
-/* Header bar */
 header {
-  background-color: var(--primary-color);
-  color: white;
+  background: var(--primary-color);
+  color: #fff;
   padding: 1rem;
   text-align: center;
-  position: sticky;
-  top: 0;
-  z-index: 100;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.2);
 }
 
-/* Buttons */
-.btn {
-  background-color: var(--primary-color);
-  color: white;
+main {
+  padding: 1rem;
+}
+
+/* hide the native file inputs */
+#cameraInput,
+#uploadInput {
+  display: none;
+}
+
+/* your floating “+” */
+.fab {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--primary-color);
+  color: #fff;
+  font-size: 2rem;
   border: none;
-  padding: 0.75rem 1.5rem;
-  margin: 0.5rem 0;
-  border-radius: 4px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  cursor: pointer;
+}
+.fab:hover {
+  background: var(--primary-dark);
+}
+
+/* back-link button */
+.back-btn {
+  background: none;
+  border: none;
+  color: var(--primary-color);
   font-size: 1rem;
   cursor: pointer;
-  transition: background-color 0.3s;
-  display: inline-block;
-  text-align: center;
-}
-.btn:hover {
-  background-color: var(--primary-dark);
+  margin-bottom: 1rem;
 }
 
-/* Container for buttons */
+/* rest of your existing styles… */
 .btn-container {
   display: flex;
   flex-direction: column;
+  gap: 0.5rem;
   align-items: center;
-  gap: 1rem;
   margin-top: 1rem;
 }
-
-/* Image preview */
+.btn {
+  background: var(--primary-color);
+  color: #fff;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 4px;
+  font-size: 1rem;
+  cursor: pointer;
+}
+.btn:hover {
+  background: var(--primary-dark);
+}
 .preview {
   width: 100%;
   margin-top: 1rem;
   border-radius: 8px;
   display: none;
 }
-
-/* OCR result text */
-.result {
-  margin-top: 1rem;
-}
-
-/* Notification toast */
 .notification {
   position: fixed;
-  bottom: 20px;
+  bottom: 24px;
   left: 50%;
   transform: translateX(-50%);
-  background-color: var(--primary-color);
-  color: white;
+  background: var(--primary-color);
+  color: #fff;
   padding: 0.75rem 1.5rem;
   border-radius: 4px;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-  z-index: 1000;
   display: none;
-  animation: slideUpFade 0.5s ease-out;
-}
-@keyframes slideUpFade {
-  from { opacity: 0; transform: translate(-50%, 20px); }
-  to   { opacity: 1; transform: translate(-50%,   0 ); }
 }
 
-/* Library list container */
-.library-list {
-  display: none;
-  padding: 0 1rem 1rem;
-}
-
-/* Book cards */
+/* library cards */
 .book-item {
   background: var(--card-bg);
   border-radius: 8px;
   box-shadow: 0 2px 6px rgba(0,0,0,0.1);
   padding: 16px;
   margin: 12px 0;
-  position: relative;
-  transition: border-left 0.3s;
 }
 .book-item.read {
   border-left: 5px solid var(--success);
 }
-
 .book-details h3 {
   margin: 0 0 4px;
 }
-
-/* Controls under each book */
 .book-controls {
   display: flex;
   flex-wrap: wrap;
@@ -130,34 +129,11 @@ header {
   cursor: pointer;
   font-size: 0.9rem;
   color: #fff;
-  transition: background 0.2s;
+  transition: opacity 0.2s;
 }
-button.edit-btn    { background: var(--warning); }
-button.delete-btn  { background: var(--danger); }
-button.toggle-read { background: var(--success); }
-button.save-btn    { background: var(--primary-color); }
-button.cancel-btn  { background: var(--light-gray); color: var(--text-color); }
-.book-controls button:hover {
-  opacity: 0.9;
-}
-
-/* Star rating */
-.rating {
-  display: flex;
-  align-items: center;
-}
-.rating span {
-  font-size: 1.2rem;
-  cursor: pointer;
-  margin-right: 2px;
-}
-.rating .filled {
-  color: gold;
-}
-.rating .empty {
-  color: var(--light-gray);
-}
-#cameraInput,
-#uploadInput {
-  display: none;
-}
+.edit-btn    { background: var(--warning); }
+.delete-btn  { background: var(--danger); }
+.toggle-read { background: var(--success); }
+.rating span { cursor: pointer; font-size: 1.2rem; margin-right: 2px; }
+.rating .filled { color: gold; }
+.rating .empty  { color: var(--light-gray); }
