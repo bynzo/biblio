@@ -43,7 +43,13 @@ header {
   transition: background 0.2s;
 }
 
-.btn:hover {
+/* Disabled state */
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn:hover:enabled {
   background: var(--primary-dark);
 }
 

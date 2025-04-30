@@ -1,8 +1,9 @@
-// === Configuration ===
+// === Config & Keys ===
 const BACKEND_URL = "https://biblio-c1en.onrender.com/proxy-google-vision";
-const libraryKey = "biblioLibrary";
+const LIB_KEY = "biblioLibrary";
+const OCR_CACHE_KEY = "ocrCache";
 
-// === DOM References ===
+// === DOM refs ===
 const cameraInput = document.getElementById("cameraInput");
 const uploadInput = document.getElementById("uploadInput");
 const previewImage = document.getElementById("previewImage");
@@ -20,20 +21,25 @@ function showNotification(msg) {
 }
 
 function getLibrary() {
-  return JSON.parse(localStorage.getItem(libraryKey) || "[]");
+  return JSON.parse(localStorage.getItem(LIB_KEY) || "[]");
 }
 
 function saveLibrary(lib) {
-  localStorage.setItem(libraryKey, JSON.stringify(lib));
+  localStorage.setItem(LIB_KEY, JSON.stringify(lib));
 }
 
-// === File Pickers ===
-function openCamera() {
-  cameraInput.click();
+function getOcrCache() {
+  return JSON.parse(localStorage.getItem(OCR_CACHE_KEY) || "{}");
 }
-function openLibrary() {
-  uploadInput.click();
+
+function saveOcrCache(cache) {
+  localStorage.setItem(OCR_CACHE_KEY, JSON.stringify(cache));
 }
+
+// === File pickers ===
+function openCamera() { cameraInput.click(); }
+function openLibrary() { uploadInput.click(); }
+
 [cameraInput, uploadInput].forEach(input => {
   input.addEventListener("change", e => {
     const file = e.target.files[0];
@@ -49,70 +55,102 @@ function openLibrary() {
   });
 });
 
-// === Extract & Save Book ===
+// === Extract Handler ===
 extractBtn.addEventListener("click", async () => {
-  if (!previewImage.src) {
+  const dataUrl = previewImage.src;
+  if (!dataUrl) {
     showNotification("Please choose an image first.");
     return;
   }
-  showNotification("Processing image…");
-  try {
-    // 1) Send image to OCR backend
-    const base64 = previewImage.src.split(",")[1];
-    const ocrRes = await fetch(BACKEND_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ image: base64 })
-    }).then(r => r.json());
 
-    // 2) Extract first non-blank line
-    const text = ocrRes.responses?.[0]?.fullTextAnnotation?.text || "";
-    const title = text.split("\n").find(l => l.trim())?.trim();
+  // disable while scanning
+  extractBtn.disabled = true;
+  const origText = extractBtn.textContent;
+  extractBtn.textContent = "Scanning…";
+
+  try {
+    const base64 = dataUrl.split(",")[1];
+
+    // 1) check OCR cache
+    const ocrCache = getOcrCache();
+    let title = ocrCache[base64];
+
     if (!title) {
-      showNotification("No text found in image.");
-      return;
+      // 2) call backend using documentTextDetection
+      const res = await fetch(BACKEND_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image: base64 })
+      });
+
+      if (!res.ok) {
+        throw new Error(`Server returned ${res.status}`);
+      }
+
+      // response shape: { text: "full detected text…" }
+      const { text: fullText = "" } = await res.json();
+
+      // 3) parse first non-empty line
+      title = fullText
+        .split("\n")
+        .map(l => l.trim())
+        .find(l => l.length > 0);
+
+      if (!title) {
+        showNotification("No text found in image.");
+        return;
+      }
+
+      // 4) cache OCR result
+      ocrCache[base64] = title;
+      saveOcrCache(ocrCache);
     }
+
     recognizedTitle.innerHTML = `<strong>Title:</strong> ${title}`;
 
-    // 3) Check library for duplicates
+    // 5) check library duplicate
     const library = getLibrary();
     if (library.some(b => b.title.toLowerCase() === title.toLowerCase())) {
       showNotification("This book is already in your library.");
       return;
     }
 
-    // 4) Fetch book details from OpenLibrary
-    const booksData = await fetch(
+    // 6) fetch book details from OpenLibrary
+    const lookup = await fetch(
       `https://openlibrary.org/search.json?title=${encodeURIComponent(title)}&limit=1`
     ).then(r => r.json());
 
-    const doc = booksData.docs?.[0];
+    const doc = lookup.docs?.[0] || {};
     const book = {
       title,
-      author: doc?.author_name?.join(", ") || "Unknown",
-      year: doc?.first_publish_year || "Unknown"
+      author: doc.author_name?.join(", ") || "Unknown",
+      year: doc.first_publish_year || "Unknown"
     };
 
-    // 5) Save to localStorage
+    // 7) save to library
     library.push(book);
     saveLibrary(library);
     showNotification("Book added to library!");
-
   } catch (err) {
     console.error(err);
     showNotification("Error: " + err.message);
+  } finally {
+    extractBtn.disabled = false;
+    extractBtn.textContent = origText;
   }
 });
 
 // === Show / Hide Library ===
 showLibBtn.addEventListener("click", () => {
   const lib = getLibrary();
-  libraryList.innerHTML = ""; // clear
+  libraryList.innerHTML = "";
+
   if (libraryList.style.display === "block") {
     libraryList.style.display = "none";
     showLibBtn.textContent = "Show Library";
     return;
   }
+
   showLibBtn.textContent = "Hide Library";
   libraryList.style.display = "block";
 
@@ -122,18 +160,18 @@ showLibBtn.addEventListener("click", () => {
   }
 
   lib.forEach(b => {
-    const item = document.createElement("div");
-    item.className = "book-item";
-    item.innerHTML = `
+    const div = document.createElement("div");
+    div.className = "book-item";
+    div.innerHTML = `
       <h3>${b.title}</h3>
       <p><strong>Author:</strong> ${b.author}</p>
       <p><strong>Year:</strong> ${b.year}</p>
     `;
-    libraryList.appendChild(item);
+    libraryList.appendChild(div);
   });
 });
 
-// === Register SW (unchanged) ===
+// === Service Worker ===
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js");
 }
