@@ -13,48 +13,62 @@
     <h1>Scan & Add Books</h1>
   </header>
   <main>
-  <!-- 1) Back button, restyled -->
-  <div class="back-container">
-    <button id="backBtn" class="btn back-btn">← Back to Library</button>
-  </div>
 
-  <!-- 2) Hidden file inputs -->
-  <input type="file" accept="image/*" capture="environment"
-         id="cameraInput" style="display:none"/>
-  <input type="file" accept="image/*"
-         id="uploadInput" style="display:none"/>
+    <!-- 1) Discrete “Back to Library” link -->
+    <div class="back-container">
+      <button id="backBtn" class="link-btn">← Back to Library</button>
+    </div>
 
-  <!-- 3) Tile-style buttons for photo / upload -->
-  <div class="tile-grid">
-    <button id="cameraBtn" class="tile-btn" onclick="openCamera()">
-      <span class="tile-icon">📷</span>
-      <span class="tile-label">Take Photo</span>
-    </button>
-    <button id="uploadBtn" class="tile-btn" onclick="openLibrary()">
-      <span class="tile-icon">📁</span>
-      <span class="tile-label">Upload Photo</span>
-    </button>
-  </div>
+    <!-- 2) Hidden file inputs -->
+    <input type="file" accept="image/*" capture="environment"
+           id="cameraInput" style="display:none"/>
+    <input type="file" accept="image/*"
+           id="uploadInput" style="display:none"/>
 
-  <!-- preview appears here -->
-  <img id="previewImage" class="preview" style="display:none"/>
+    <!-- 3) Tile-style buttons for all three actions -->
+    <div class="tile-grid">
+      <button id="cameraBtn" class="tile-btn" onclick="openCamera()">
+        <span class="tile-icon">📷</span>
+        <span class="tile-label">Take Photo</span>
+      </button>
+      <button id="uploadBtn" class="tile-btn" onclick="openLibrary()">
+        <span class="tile-icon">📁</span>
+        <span class="tile-label">Upload Photo</span>
+      </button>
+      <button id="manualBtn" class="tile-btn">
+        <span class="tile-icon">✏️</span>
+        <span class="tile-label">Add Manually</span>
+      </button>
+    </div>
 
-  <!-- 4) extract + manual entry -->
-  <div class="btn-container">
-    <button id="extractBtn" class="btn" style="display:none">
-      Extract Info
-    </button>
-    <button id="manualBtn" class="btn">
-      Add Manually
-    </button>
-  </div>
+    <!-- Preview of chosen image -->
+    <img id="previewImage" class="preview" style="display:none" />
 
-  <!-- existing overlay & notifications -->
-  <div id="loadingOverlay" class="loading-overlay">
-    <span>Processing…</span>
-  </div>
-  <div id="notification" class="notification"></div>
-</main>
+    <!-- 4) Extract Info appears only after picking a photo -->
+    <div class="btn-container">
+      <button id="extractBtn" class="btn" style="display:none">
+        Extract Info
+      </button>
+    </div>
+
+    <!-- 5) Inline manual‐entry form -->
+    <div id="manualForm" class="manual-form" style="display:none;">
+      <input type="text" id="manualTitle"  placeholder="Book Title" />
+      <input type="text" id="manualAuthor" placeholder="Author"     />
+      <input type="text" id="manualYear"   placeholder="Year"       />
+      <div class="manual-buttons">
+        <button id="manualSave"   class="btn save-btn">Save</button>
+        <button id="manualCancel" class="btn cancel-btn">Cancel</button>
+      </div>
+    </div>
+
+    <!-- Loading overlay & notifications -->
+    <div id="loadingOverlay" class="loading-overlay">
+      <span>Processing…</span>
+    </div>
+    <div id="notification" class="notification"></div>
+
+  </main>
 
   <script src="app.js"></script>
 </body>
