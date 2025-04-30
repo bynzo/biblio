@@ -11,6 +11,7 @@
   --danger:  #e53935;
 }
 
+/* Global resets */
 body {
   background: var(--background);
   color: var(--text-color);
@@ -18,6 +19,85 @@ body {
   font-family: "Segoe UI", sans-serif;
 }
 
+/* Header bar */
+header {
+  background-color: var(--primary-color);
+  color: white;
+  padding: 1rem;
+  text-align: center;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+/* Buttons */
+.btn {
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  margin: 0.5rem 0;
+  border-radius: 4px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background-color 0.3s;
+  display: inline-block;
+  text-align: center;
+}
+.btn:hover {
+  background-color: var(--primary-dark);
+}
+
+/* Container for buttons */
+.btn-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+/* Image preview */
+.preview {
+  width: 100%;
+  margin-top: 1rem;
+  border-radius: 8px;
+  display: none;
+}
+
+/* OCR result text */
+.result {
+  margin-top: 1rem;
+}
+
+/* Notification toast */
+.notification {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: var(--primary-color);
+  color: white;
+  padding: 0.75rem 1.5rem;
+  border-radius: 4px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+  z-index: 1000;
+  display: none;
+  animation: slideUpFade 0.5s ease-out;
+}
+@keyframes slideUpFade {
+  from { opacity: 0; transform: translate(-50%, 20px); }
+  to   { opacity: 1; transform: translate(-50%,   0 ); }
+}
+
+/* Library list container */
+.library-list {
+  display: none;
+  padding: 0 1rem 1rem;
+}
+
+/* Book cards */
 .book-item {
   background: var(--card-bg);
   border-radius: 8px;
@@ -27,7 +107,6 @@ body {
   position: relative;
   transition: border-left 0.3s;
 }
-
 .book-item.read {
   border-left: 5px solid var(--success);
 }
@@ -36,6 +115,7 @@ body {
   margin: 0 0 4px;
 }
 
+/* Controls under each book */
 .book-controls {
   display: flex;
   flex-wrap: wrap;
@@ -43,7 +123,6 @@ body {
   margin-top: 12px;
   align-items: center;
 }
-
 .book-controls button {
   border: none;
   padding: 6px 12px;
@@ -53,32 +132,28 @@ body {
   color: #fff;
   transition: background 0.2s;
 }
-
 button.edit-btn    { background: var(--warning); }
 button.delete-btn  { background: var(--danger); }
 button.toggle-read { background: var(--success); }
 button.save-btn    { background: var(--primary-color); }
 button.cancel-btn  { background: var(--light-gray); color: var(--text-color); }
-
 .book-controls button:hover {
   opacity: 0.9;
 }
 
+/* Star rating */
 .rating {
   display: flex;
   align-items: center;
 }
-
 .rating span {
   font-size: 1.2rem;
   cursor: pointer;
   margin-right: 2px;
 }
-
 .rating .filled {
   color: gold;
 }
-
 .rating .empty {
   color: var(--light-gray);
 }
