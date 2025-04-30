@@ -5,27 +5,29 @@ const LIB_KEY     = "biblioLibrary";
 const OCR_CACHE   = "ocrCache";
 
 // ——— DOM refs ———
-const cameraTile    = document.getElementById("cameraTile");
-const libraryTile   = document.getElementById("libraryTile");
-const manualBtn     = document.getElementById("manualBtn");
-const backBtn       = document.getElementById("backBtn");
-const previewImage  = document.getElementById("previewImage");
-const extractBtn    = document.getElementById("extractBtn");
-const manualForm    = document.getElementById("manualForm");
-const manualTitle   = document.getElementById("manualTitle");
-const manualAuthor  = document.getElementById("manualAuthor");
-const manualYear    = document.getElementById("manualYear");
-const manualSaveBtn = document.getElementById("manualSaveBtn");
-const manualCancelBtn = document.getElementById("manualCancelBtn");
-const loadingOv     = document.getElementById("loadingOverlay");
-const notification  = document.getElementById("notification");
-const libraryList   = document.getElementById("libraryList");
+// (shared between index.html and scan.html)
+const cameraInput    = document.getElementById("cameraInput");
+const uploadInput    = document.getElementById("uploadInput");
+const previewImage   = document.getElementById("previewImage");
+const extractBtn     = document.getElementById("extractBtn");
+const manualBtn      = document.getElementById("manualBtn");
+const backBtn        = document.getElementById("backBtn");
+const manualForm     = document.getElementById("manualForm");
+const manualTitle    = document.getElementById("manualTitle");
+const manualAuthor   = document.getElementById("manualAuthor");
+const manualYear     = document.getElementById("manualYear");
+const manualSaveBtn  = document.getElementById("manualSaveBtn");
+const manualCancelBtn= document.getElementById("manualCancelBtn");
+const addBooksBtn    = document.getElementById("addBooksBtn");
+const libraryList    = document.getElementById("libraryList");
+const notification   = document.getElementById("notification");
+const loadingOv      = document.getElementById("loadingOverlay");
 
 // ——— Storage helpers ———
 const getLibrary  = () => JSON.parse(localStorage.getItem(LIB_KEY)   || "[]");
-const saveLibrary = l => localStorage.setItem(LIB_KEY, JSON.stringify(l));
+const saveLibrary = lib => localStorage.setItem(LIB_KEY, JSON.stringify(lib));
 const getCache    = () => JSON.parse(localStorage.getItem(OCR_CACHE) || "{}");
-const saveCache   = c => localStorage.setItem(OCR_CACHE, JSON.stringify(c));
+const saveCache   = c   => localStorage.setItem(OCR_CACHE, JSON.stringify(c));
 
 // ——— Notifications ———
 function showNotification(msg) {
@@ -35,16 +37,19 @@ function showNotification(msg) {
 }
 
 // ——— Navigation Buttons ———
+// index.html "＋" button → scan.html
+if (addBooksBtn) {
+  addBooksBtn.onclick = () => location.href = "scan.html";
+}
+// scan.html Back button → index.html
 if (backBtn) {
   backBtn.onclick = () => location.href = "index.html";
 }
 
 // ——— Library Page ———
 if (libraryList) {
-  document.getElementById("addBooksBtn")?.onclick = () => location.href = "scan.html";
   renderLibrary();
 }
-
 function renderLibrary() {
   const lib = getLibrary();
   libraryList.innerHTML = "";
@@ -64,7 +69,7 @@ function renderLibrary() {
       <div class="book-controls">
         <button class="edit-btn">Edit</button>
         <button class="delete-btn">Delete</button>
-        <button class="toggle-read">${book.read?"Mark Unread":"Mark Read"}</button>
+        <button class="toggle-read">${book.read ? "Mark Unread" : "Mark Read"}</button>
         <div class="rating"></div>
       </div>
     `;
@@ -72,19 +77,21 @@ function renderLibrary() {
 
     // Delete
     card.querySelector(".delete-btn").onclick = () => {
-      lib.splice(i,1);
+      lib.splice(i, 1);
       saveLibrary(lib);
       renderLibrary();
     };
+
     // Toggle read/unread
     card.querySelector(".toggle-read").onclick = () => {
       book.read = !book.read;
       saveLibrary(lib);
       renderLibrary();
     };
-    // Rating
+
+    // Star rating
     const stars = card.querySelector(".rating");
-    for (let n=1; n<=5; n++) {
+    for (let n = 1; n <= 5; n++) {
       const s = document.createElement("span");
       s.textContent = n <= book.rating ? "★" : "☆";
       s.className = n <= book.rating ? "filled" : "empty";
@@ -95,12 +102,13 @@ function renderLibrary() {
       };
       stars.appendChild(s);
     }
+
     // Edit
-    card.querySelector(".edit-btn").onclick = () => enterEdit(card, book, i);
+    card.querySelector(".edit-btn").onclick = () => enterEditMode(card, book, i);
   });
 }
 
-function enterEdit(card, book, idx) {
+function enterEditMode(card, book, idx) {
   const details = card.querySelector(".book-details");
   const ctrls   = card.querySelector(".book-controls");
   details.style.display = ctrls.style.display = "none";
@@ -108,7 +116,7 @@ function enterEdit(card, book, idx) {
   const form = document.createElement("div");
   form.className = "edit-form";
   form.innerHTML = `
-    <p><input class="edit-title"  value="${book.title}"  /></p>
+    <p><input class="edit-title"  value="${book.title}" /></p>
     <p><input class="edit-author" value="${book.author}" /></p>
     <p><input class="edit-year"   value="${book.year}"   /></p>
     <div class="edit-buttons">
@@ -130,22 +138,16 @@ function enterEdit(card, book, idx) {
   form.querySelector(".cancel-btn").onclick = () => renderLibrary();
 }
 
-// ——— Scan Page ———
+// ——— Scan & OCR Flow ———
 if (extractBtn) {
-  // Hide manual form initially
-  manualForm.style.display = "none";
+  // hide manual form until needed
+  if (manualForm) manualForm.style.display = "none";
 
-  // Tile wiring
-  cameraTile.onclick  = () => cameraInput.click();
-  libraryTile.onclick = () => uploadInput.click();
-  manualBtn.onclick   = () => {
-    previewImage.style.display = "none";
-    extractBtn.style.display   = "none";
-    manualForm.style.display   = "block";
-  };
-  backBtn.classList.add("link-btn");
+  // helper to trigger file pickers
+  window.openCamera  = () => cameraInput.click();
+  window.openLibrary = () => uploadInput.click();
 
-  // File pickers
+  // when a file is chosen…
   [cameraInput, uploadInput].forEach(inp => {
     inp.onchange = e => {
       const f = e.target.files[0];
@@ -154,14 +156,14 @@ if (extractBtn) {
       reader.onload = () => {
         previewImage.src = reader.result;
         previewImage.style.display = "block";
-        extractBtn.style.display   = "block";
-        manualForm.style.display   = "none";
+        extractBtn.style.display = "inline-block";
+        if (manualForm) manualForm.style.display = "none";
       };
       reader.readAsDataURL(f);
     };
   });
 
-  // Extract button
+  // Extract Info
   extractBtn.onclick = async () => {
     extractBtn.disabled = true;
     const orig = extractBtn.textContent;
@@ -169,68 +171,68 @@ if (extractBtn) {
     loadingOv.classList.add("show");
 
     try {
-      // OCR + cache
+      // 1) OCR (cached)
       const b64 = previewImage.src.split(",")[1];
       const cache = getCache();
       let lines = cache[b64];
       if (!lines) {
-        const r = await fetch(BACKEND_URL, {
+        const res = await fetch(BACKEND_URL, {
           method: "POST",
-          headers: {"Content-Type":"application/json"},
-          body: JSON.stringify({image: b64})
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ image: b64 })
         });
-        const ocr = await r.json();
-        const raw = ocr.fullTextAnnotation?.text || ocr.text || "";
-        lines = raw.split("\n").map(x=>x.trim()).filter(x=>x);
+        if (!res.ok) throw new Error("OCR error " + res.status);
+        const o = await res.json();
+        const raw = o.fullTextAnnotation?.text || o.text || "";
+        lines = raw.split("\n").map(l=>l.trim()).filter(l=>l);
         cache[b64] = lines;
         saveCache(cache);
       }
 
-      // LLM filter
+      // 2) GPT filter
       let titles;
       try {
         const r = await fetch(FILTER_URL, {
           method: "POST",
-          headers: {"Content-Type":"application/json"},
-          body: JSON.stringify({text: lines.join("\n")})
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: lines.join("\n") })
         });
         const j = await r.json();
-        titles = Array.isArray(j.titles) ? j.titles : [j.title||""];
-      } catch(_) {
+        titles = Array.isArray(j.titles) ? j.titles : [j.title || ""];
+      } catch (_) {
         titles = lines;
       }
 
-      // Add to library
+      // 3) lookup + add
       const lib = getLibrary();
       let added = false;
       for (let t of titles) {
         t = t.trim();
         if (!t || lib.some(b=>b.title.toLowerCase()===t.toLowerCase())) continue;
-        // lookup
         let author="Unknown", year="Unknown";
         try {
-          const r = await fetch(
-            `https://openlibrary.org/search.json?title=${encodeURIComponent(t)}&limit=1`
-          );
+          const r = await fetch(`https://openlibrary.org/search.json?title=${encodeURIComponent(t)}&limit=1`);
           const j = await r.json();
           const d = j.docs?.[0];
           if (d) {
-            author = d.author_name?.join(", ")||author;
-            year   = d.first_publish_year||year;
+            author = d.author_name?.join(", ") || author;
+            year   = d.first_publish_year || year;
           }
-        } catch(_) {}
-        lib.push({title:t,author,year,read:false,rating:0});
+        } catch {}
+        lib.push({ title: t, author, year, read: false, rating: 0 });
         added = true;
       }
+
       if (added) {
         saveLibrary(lib);
         showNotification("✅ Added new book(s)!");
       } else {
         showNotification("ℹ️ No new books found.");
       }
-    } catch (e) {
-      console.error(e);
-      showNotification("❌ " + e.message);
+
+    } catch (err) {
+      console.error(err);
+      showNotification("❌ " + err.message);
     } finally {
       extractBtn.disabled = false;
       extractBtn.textContent = orig;
@@ -238,22 +240,26 @@ if (extractBtn) {
     }
   };
 
-  // Manual Save / Cancel
-  manualSaveBtn.onclick = () => {
-    const t = manualTitle.value.trim();
-    if (!t) return showNotification("Please enter a title.");
-    const author = manualAuthor.value.trim() || "Unknown";
-    const year   = manualYear.value.trim()   || "Unknown";
-    const lib = getLibrary();
-    lib.push({title:t,author,year,read:false,rating:0});
-    saveLibrary(lib);
-    showNotification("✅ Added manually!");
-    manualForm.style.display = "none";
-    location.href = "index.html";
-  };
-  manualCancelBtn.onclick = () => {
-    manualForm.style.display = "none";
-  };
+  // Manual entry
+  if (manualBtn && manualForm && manualSaveBtn && manualCancelBtn) {
+    manualBtn.onclick = () => {
+      previewImage.style.display = "none";
+      extractBtn.style.display = "none";
+      manualForm.style.display = "block";
+    };
+    manualSaveBtn.onclick = () => {
+      const t = manualTitle.value.trim();
+      if (!t) return showNotification("Please enter a title.");
+      const a = manualAuthor.value.trim() || "Unknown";
+      const y = manualYear.value.trim()   || "Unknown";
+      const lib = getLibrary();
+      lib.push({ title: t, author: a, year: y, read: false, rating: 0 });
+      saveLibrary(lib);
+      showNotification("✅ Added manually!");
+      location.href = "index.html";
+    };
+    manualCancelBtn.onclick = () => manualForm.style.display = "none";
+  }
 }
 
 // ——— Service Worker ———
