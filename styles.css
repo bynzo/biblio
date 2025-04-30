@@ -34,7 +34,7 @@ main {
   display: none;
 }
 
-/* your floating “+” */
+/* Floating “+” */
 .fab {
   position: fixed;
   bottom: 24px;
@@ -53,7 +53,7 @@ main {
   background: var(--primary-dark);
 }
 
-/* back-link button */
+/* Back-link button */
 .back-btn {
   background: none;
   border: none;
@@ -63,7 +63,7 @@ main {
   margin-bottom: 1rem;
 }
 
-/* rest of your existing styles… */
+/* Buttons, preview, notification */
 .btn-container {
   display: flex;
   flex-direction: column;
@@ -101,7 +101,7 @@ main {
   display: none;
 }
 
-/* library cards */
+/* Library cards */
 .book-item {
   background: var(--card-bg);
   border-radius: 8px;
@@ -134,6 +134,16 @@ main {
 .edit-btn    { background: var(--warning); }
 .delete-btn  { background: var(--danger); }
 .toggle-read { background: var(--success); }
-.rating span { cursor: pointer; font-size: 1.2rem; margin-right: 2px; }
+
+/* Stars */
+.rating {
+  display: flex;
+  align-items: center;
+}
+.rating span {
+  cursor: pointer;
+  font-size: 1.2rem;
+  margin-right: 2px;
+}
 .rating .filled { color: gold; }
 .rating .empty  { color: var(--light-gray); }
